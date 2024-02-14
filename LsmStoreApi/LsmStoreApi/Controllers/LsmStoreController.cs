@@ -3,11 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LsmStoreApi.Controllers
 {
-    public static class LsmTreeManager
-    {
-        public static ILsmTreeStore StoreTest = new LsmTreeStore("deneme");
-    }
-    
+
     [ApiController]
     [Route("[controller]/[action]")]
     public class LsmStoreController:ControllerBase

@@ -1,4 +1,3 @@
-using LsmStoreApi.Controllers;
 using LsmStoreApi.LsmStore;
 
 var builder = WebApplication.CreateBuilder(args);

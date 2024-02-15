@@ -43,26 +43,23 @@ namespace LsmStoreApi.LsmStore
 
             bloomFilter = new Filter<string>(500);
 
-            using (var file = new FileStream(dbPath, FileMode.OpenOrCreate, FileAccess.Write))
+            using var file = new FileStream(dbPath, FileMode.OpenOrCreate, FileAccess.Write);
+            using var binary = new BinaryWriter(file);
+
+            foreach (var item in storeData)
             {
-                using (var binary = new BinaryWriter(file))
-                {
-                    foreach (var item in storeData)
-                    {
-                        var data = Encoding.UTF8.GetBytes(item.Key + "::" + item.Value);
+                var data = Encoding.UTF8.GetBytes(item.Key + "::" + item.Value);
 
-                        indexDb.Add(item.Key, binary.BaseStream.Position);
-                        binary.Write(data.Length);
-                        binary.Write(data);
+                indexDb.Add(item.Key, binary.BaseStream.Position);
+                binary.Write(data.Length);
+                binary.Write(data);
 
-                        bloomFilter.Add(item.Key);
-                    }
-
-                    binary.Flush();
-
-                    file.Close();
-                }
+                bloomFilter.Add(item.Key);
             }
+
+            binary.Flush();
+
+            file.Close();
 
             WriteIndex(indexDb.ToDictionary(x => x.Key, x => x.Value));
 
@@ -148,21 +145,17 @@ namespace LsmStoreApi.LsmStore
 
             indexDb.Clear();
 
-            using (var file = new FileStream(indexPath, FileMode.OpenOrCreate, FileAccess.Read))
+            using var file = new FileStream(indexPath, FileMode.OpenOrCreate, FileAccess.Read);
+            using var binary = new BinaryReader(file);
+            while (binary.BaseStream.Position < binary.BaseStream.Length)
             {
-                using (var binary = new BinaryReader(file))
-                {
-                    while (binary.BaseStream.Position < binary.BaseStream.Length)
-                    {
-                        var key = binary.ReadString();
-                        var value = binary.ReadInt64();
+                var key = binary.ReadString();
+                var value = binary.ReadInt64();
 
-                        indexDb.Add(key, value);
-                    }
-
-                    file.Close();
-                }
+                indexDb.Add(key, value);
             }
+
+            file.Close();
         }
 
         /// <summary>
@@ -171,21 +164,17 @@ namespace LsmStoreApi.LsmStore
         /// <param name="indexData"></param>
         public void WriteIndex(Dictionary<string, long> indexData)
         {
-            using (var file = new FileStream(indexPath, FileMode.OpenOrCreate, FileAccess.Write))
+            using var file = new FileStream(indexPath, FileMode.OpenOrCreate, FileAccess.Write);
+            using var binary = new BinaryWriter(file);
+
+            foreach (var item in indexData)
             {
-                using (var binary = new BinaryWriter(file))
-                {
-                    foreach (var item in indexData)
-                    {
-                        binary.Write(item.Key);
-                        binary.Write(item.Value);
-                    }
-
-                    binary.Flush();
-
-                    file.Close();
-                }
+                binary.Write(item.Key);
+                binary.Write(item.Value);
             }
+
+            binary.Flush();
+            file.Close();
         }
 
         /// <summary>
@@ -321,26 +310,23 @@ namespace LsmStoreApi.LsmStore
         /// <returns></returns>
         private string? GetValueAt(long position)
         {
-            using (var file = new FileStream(dbPath, FileMode.OpenOrCreate, FileAccess.Read))
+            using var file = new FileStream(dbPath, FileMode.OpenOrCreate, FileAccess.Read);
+            file.Position = position;
+
+            using var binary = new BinaryReader(file);
+
+            while (binary.BaseStream.Position < binary.BaseStream.Length)
             {
-                file.Position = position;
+                var length = binary.ReadInt32();
 
-                using (var binary = new BinaryReader(file))
-                {
-                    while (binary.BaseStream.Position < binary.BaseStream.Length)
-                    {
-                        var length = binary.ReadInt32();
+                var value = Encoding.UTF8.GetString(binary.ReadBytes(length));
 
-                        var value = Encoding.UTF8.GetString(binary.ReadBytes(length));
+                var data = value.Split("::");
 
-                        var data = value.Split("::");
-
-                        return data[1];
-                    }
-
-                    file.Close();
-                }
+                return data[1];
             }
+
+            file.Close();
 
             return null;
         }

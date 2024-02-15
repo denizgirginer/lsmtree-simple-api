@@ -75,7 +75,7 @@ namespace LsmStoreApi.LsmStore
         /// <summary>
         /// Bloom filter yükler
         /// </summary>
-        private void LoadBloomFilter()
+        public void LoadBloomFilter()
         {
             if (!File.Exists(bloomFilterPath))
                 return;
@@ -98,7 +98,7 @@ namespace LsmStoreApi.LsmStore
         /// <summary>
         /// Bloomfilter kayıt eder
         /// </summary>
-        private void WriteBloomFilter()
+        public void WriteBloomFilter()
         {
             var data = bloomFilter.ToBoolArray();
 
@@ -113,6 +113,14 @@ namespace LsmStoreApi.LsmStore
             binary.Flush();
             file.Close();
 
+        }
+
+        public void WriteBloomFilter(IList<string> keys)
+        {
+            foreach (var key in keys) {
+                bloomFilter.Add(key);
+            }
+            WriteBloomFilter();
         }
 
         /// <summary>

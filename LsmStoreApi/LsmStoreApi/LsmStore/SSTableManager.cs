@@ -24,7 +24,7 @@ namespace LsmStoreApi.LsmStore
             var ssTable = new SSTable($"{indexName}-{Guid.NewGuid()}");
 
             ssTable.Write(data);
-            ssTables.Add(ssTable);
+            ssTables.Insert(0, ssTable);
         }
 
         /// <summary>
@@ -107,8 +107,8 @@ namespace LsmStoreApi.LsmStore
 
                 var ssTableMerge = new SSTable($"{this.indexName}-{Guid.NewGuid()}", level+1);
                 var indexDbMerge = new SortedDictionary<string, long>();
-                var fileMerge = new FileStream(ssTableMerge.DbPath, FileMode.OpenOrCreate, FileAccess.Write);
-                var binaryMerge = new BinaryWriter(fileMerge);
+                using var fileMerge = new FileStream(ssTableMerge.DbPath, FileMode.OpenOrCreate, FileAccess.Write);
+                using var binaryMerge = new BinaryWriter(fileMerge);
 
                 while (true)
                 {
@@ -171,6 +171,9 @@ namespace LsmStoreApi.LsmStore
 
                 } //true
 
+                binaryMerge.Flush();
+                fileMerge.Close();
+
                 //Remove merged ssTables
                 newerTable.Delete();
                 olderTable.Delete();
@@ -178,9 +181,14 @@ namespace LsmStoreApi.LsmStore
                 ssTables.Remove(newerTable);
                 ssTables.Remove(olderTable);
 
-                await Task.Delay(1000);
+                await Task.Delay(100);
 
                 ssTableMerge.WriteIndex(indexDbMerge.ToDictionary(x=>x.Key, x=>x.Value));
+                ssTableMerge.WriteBloomFilter(indexDbMerge.Select(x=>x.Key).ToList());
+
+                ssTableMerge.LoadIndex();
+                ssTableMerge.LoadBloomFilter();
+                ssTables.Add(ssTableMerge);
 
                 Console.WriteLine("Merge Complete:" + olderTable.IndexName+"," + newerTable.IndexName);
 

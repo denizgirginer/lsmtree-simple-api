@@ -2,6 +2,16 @@
 {
     public static class LsmTreeManager
     {
-        public static ILsmTreeStore StoreTest = new LsmTreeStore("deneme");
+        private static ILsmTreeStore _StoreTest;
+        public static ILsmTreeStore StoreTest { 
+            get
+            {
+                if(_StoreTest==null)
+                    _StoreTest = new LsmTreeStore("deneme");
+
+                return _StoreTest;
+
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Text;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace LsmStoreApi.LsmStore
 {
@@ -17,7 +18,8 @@ namespace LsmStoreApi.LsmStore
 
         public DateTime CreationTime => File.GetCreationTime(dbPath);
 
-        private BitArray bloomFilter;
+        private Filter<string> bloomFilter = new Filter<string>(500);
+
         private readonly SortedDictionary<string, long> indexDb = new SortedDictionary<string, long>();
         public SSTable(string indexName, int level = 0)
         {
@@ -26,6 +28,7 @@ namespace LsmStoreApi.LsmStore
 
             this.level = level;
             LoadIndex();
+            LoadBloomFilter();
         }
 
 
@@ -38,6 +41,8 @@ namespace LsmStoreApi.LsmStore
 
             var indexDb = new SortedDictionary<string, long>();
 
+            bloomFilter = new Filter<string>(500);
+
             using (var file = new FileStream(dbPath, FileMode.OpenOrCreate, FileAccess.Write))
             {
                 using (var binary = new BinaryWriter(file))
@@ -49,6 +54,8 @@ namespace LsmStoreApi.LsmStore
                         indexDb.Add(item.Key, binary.BaseStream.Position);
                         binary.Write(data.Length);
                         binary.Write(data);
+
+                        bloomFilter.Add(item.Key);
                     }
 
                     binary.Flush();
@@ -58,6 +65,54 @@ namespace LsmStoreApi.LsmStore
             }
 
             WriteIndex(indexDb.ToDictionary(x => x.Key, x => x.Value));
+
+            WriteBloomFilter();
+
+            LoadIndex();
+            LoadBloomFilter();
+        }
+
+        /// <summary>
+        /// Bloom filter yükler
+        /// </summary>
+        private void LoadBloomFilter()
+        {
+            if (!File.Exists(bloomFilterPath))
+                return;
+
+            using var file = new FileStream(bloomFilterPath, FileMode.Open, FileAccess.Read);
+            using var binary = new BinaryReader(file);
+
+            var data = new List<bool>();
+            while(file.Position<file.Length)
+            {
+                var value = binary.ReadBoolean();
+                data.Add(value);
+            }
+
+            bloomFilter.LoadFromBoolArray(data.ToArray());
+
+            file.Close();
+        }
+
+        /// <summary>
+        /// Bloomfilter kayıt eder
+        /// </summary>
+        private void WriteBloomFilter()
+        {
+            var data = bloomFilter.ToBoolArray();
+
+            using var file = new FileStream(bloomFilterPath, FileMode.OpenOrCreate, FileAccess.Write);
+            using var binary = new BinaryWriter(file);
+
+            foreach(var value in data)
+            {
+                binary.Write(value);
+            }
+
+            binary.Flush();
+            file.Close();
+
         }
 
         /// <summary>
@@ -70,6 +125,9 @@ namespace LsmStoreApi.LsmStore
 
             if (File.Exists(indexPath))
                 File.Delete(indexPath);
+
+            if (File.Exists(bloomFilterPath))
+                File.Delete(bloomFilterPath);
         }
 
         /// <summary>
@@ -129,11 +187,16 @@ namespace LsmStoreApi.LsmStore
         /// <returns></returns>
         public string? GetValue(string? key)
         {
-            if (!indexDb.ContainsKey(key))
-                return null;
-
             if (!File.Exists(indexPath))
                 return null;
+
+            //Bloom filter da key yoksa null döner
+            if (!bloomFilter.Contains(key))
+                return null;
+
+            if (!indexDb.ContainsKey(key))
+                return null;
+            
 
             if (indexDb.Any())
             {
@@ -182,6 +245,7 @@ namespace LsmStoreApi.LsmStore
         /// <returns></returns>
         public bool IsLastKey(string? key)
         {
+            
             if (indexDb.Any())
             {
                 return indexDb.Last().Key == key;

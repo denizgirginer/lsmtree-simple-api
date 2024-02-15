@@ -37,6 +37,7 @@ namespace LsmStoreApi.LsmStore
         public void Init()
         {
             ReadFromWAL();
+            LoadSSTables();
         }
 
         private string WalFilePath => (string)$"data/{indexName}.wal";
@@ -104,6 +105,7 @@ namespace LsmStoreApi.LsmStore
 
                         var data = value.Split("::");
 
+
                         Set(data[0], data[1]);
                     }
                 }
@@ -140,11 +142,11 @@ namespace LsmStoreApi.LsmStore
             }
 
             ///storeSize dolmuş ise sstable dosyasına memory daki key=value ları aktarır
-            if(store.Count>storeSize)
+            if(store.Count>=storeSize)
             {
                 DeleteWAL();
-                store.Clear();
                 WriteToSSTable();
+                store.Clear();
             }
         }
 

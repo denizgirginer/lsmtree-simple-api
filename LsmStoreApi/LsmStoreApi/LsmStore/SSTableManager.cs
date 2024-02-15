@@ -68,10 +68,14 @@ namespace LsmStoreApi.LsmStore
                     var level = int.Parse(indexName.Split("-").Last());
 
                     indexName = indexName.Substring(0, indexName.LastIndexOf("-"));
+
+                    if (ssTables.Any(x => x.IndexName == indexName))
+                        continue;
+
                     var ssTable = new SSTable(indexName, level);
 
-                    if (!ssTables.Any(x => x.IndexName == indexName))
-                        ssTables.Add(ssTable);
+                    
+                    ssTables.Add(ssTable);
                 }
             }
         }
